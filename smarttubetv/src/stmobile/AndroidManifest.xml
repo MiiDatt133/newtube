@@ -111,6 +111,20 @@
             android:theme="@style/Theme.NewTube" />
 
         <!--
+          Dedicated vertical Shorts feed (the bottom nav's Shorts tab). Portrait like the
+          official Shorts surface - one full-screen Short per swipe; configChanges keeps the
+          single ExoPlayer (and its surface) alive across the changes it can still get while
+          this screen is up (uiMode, size on foldables).
+        -->
+        <activity
+            android:name="com.newtube.mobile.ui.shorts.MobileShortsActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|layoutDirection|keyboardHidden|uiMode"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.NewTube" />
+
+        <!--
           Touch player (Wave 2). configChanges covers orientation/screenSize/keyboardHidden so
           the Activity (and the live ExoPlayer instance it holds) survives device rotation
           instead of being torn down and recreated - rotating to landscape is exactly how the

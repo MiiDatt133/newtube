@@ -154,6 +154,12 @@
 
     <!-- Bottom-nav "You" tab (account + extra sections + settings) -->
     <string name="mobile_nav_you">You</string>
+    <!-- Bottom-nav "Shorts" tab: the dedicated vertical Shorts feed (MobileShortsActivity). -->
+    <string name="mobile_nav_shorts">Shorts</string>
+    <string name="mobile_shorts_back">Back</string>
+    <string name="mobile_shorts_unmute">Unmute</string>
+    <string name="mobile_shorts_empty">No Shorts to show right now</string>
+    <string name="mobile_shorts_load_error">Couldn\'t load Shorts.</string>
     <!-- You-tab group label over the discovery feeds (Music, Gaming, News, ...). -->
     <string name="mobile_you_explore">Explore</string>
 

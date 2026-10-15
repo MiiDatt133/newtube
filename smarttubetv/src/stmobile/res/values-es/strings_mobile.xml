@@ -6,6 +6,12 @@
     <string name="mobile_nav_you">Tú</string>
     <string name="mobile_you_explore">Explorar</string>
 
+    <!-- NEWTUBE(shorts): the dedicated Shorts feed (MobileShortsActivity). -->
+    <string name="mobile_shorts_back">Atrás</string>
+    <string name="mobile_shorts_unmute">Activar sonido</string>
+    <string name="mobile_shorts_empty">No hay Shorts para mostrar ahora mismo</string>
+    <string name="mobile_shorts_load_error">No se pudieron cargar los Shorts.</string>
+
     <!-- Upstream es translation says "REGISTRARSE" (= create an account) on every sign-in
          button - wrong action. App-module resources override the library's, so fix it here
          (the en default "SIGN IN" is overridden in values/strings_mobile.xml too). -->

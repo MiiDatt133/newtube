@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vietnamese for the dedicated Shorts feed (MobileShortsActivity). Only the strings this
+     feature adds; everything else falls back to the English default. If Weblate later opens
+     Vietnamese for the App component, keep its translations for the other strings and leave
+     these in sync. "Shorts" stays "Shorts" (a YouTube feature name). -->
+<resources>
+    <string name="mobile_shorts_back">Quay lại</string>
+    <string name="mobile_shorts_unmute">Bật tiếng</string>
+    <string name="mobile_shorts_empty">Hiện chưa có Shorts nào</string>
+    <string name="mobile_shorts_load_error">Không tải được Shorts.</string>
+</resources>

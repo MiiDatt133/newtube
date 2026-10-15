@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NEWTUBE(shorts): the dedicated Shorts feed - a full-bleed vertical pager (one Short per page,
+  PagerSnapHelper) under a thin player chrome: buffer spinner, playback progress, back, mute,
+  and the first-load skeleton / empty-or-error overlay (MobileShortsActivity).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/mobile_shorts_pager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:overScrollMode="never" />
+
+    <ProgressBar
+        android:id="@+id/mobile_shorts_buffer"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:layout_gravity="top"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/mobile_player_on_video"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/mobile_shorts_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:layout_gravity="bottom"
+        android:max="1000"
+        android:progressDrawable="@drawable/bg_mobile_shorts_progress"
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/mobile_shorts_back"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_mini_scrim_circle"
+        android:contentDescription="@string/mobile_shorts_back"
+        android:padding="8dp"
+        android:src="@drawable/ic_mobile_back_arrow"
+        android:tint="@color/mobile_player_on_video" />
+
+    <ImageButton
+        android:id="@+id/mobile_shorts_mute"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="96dp"
+        android:background="@drawable/bg_mini_scrim_circle"
+        android:contentDescription="@string/action_sound_off"
+        android:padding="8dp"
+        android:src="@drawable/action_sound_on"
+        android:tint="@color/mobile_player_on_video" />
+
+    <ProgressBar
+        android:id="@+id/mobile_shorts_skeleton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/mobile_player_on_video"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/mobile_shorts_message_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/mobile_shorts_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/mobile_player_on_video"
+            android:textSize="16sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/mobile_shorts_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/mobile_signin_retry_button"
+            android:visibility="gone" />
+    </LinearLayout>
+
+</FrameLayout>

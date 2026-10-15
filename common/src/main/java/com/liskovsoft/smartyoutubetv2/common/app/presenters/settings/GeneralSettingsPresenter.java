@@ -309,7 +309,8 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
 
         for (Entry<Integer, Integer> section : sections.entrySet()) {
             // NEWTUBE(settings): on the phone, only sections it can actually open at boot - the
-            // enabled ones, never Shorts (retired on the phone) or Settings (not a feed). The current
+            // enabled ones, never Shorts (its nav tab opens the dedicated full-screen feed, not a
+            // boot grid) or Settings (not a feed). The current
             // pick stays listed even if hidden since, so the radio group never loses its checked row.
             int sectionId = section.getValue();
             boolean current = section.getValue().equals(mSidebarService.getBootSectionId());

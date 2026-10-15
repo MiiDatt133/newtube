@@ -71,6 +71,7 @@ import com.newtube.mobile.ui.common.MobileSnackbar;
 import com.newtube.mobile.ui.common.Motion;
 import com.newtube.mobile.ui.common.ShortsFilter;
 import com.newtube.mobile.ui.common.SkeletonReveal;
+import com.newtube.mobile.ui.shorts.MobileShortsActivity;
 import com.newtube.mobile.ui.update.MobileUpdateActivity;
 import com.newtube.mobile.update.AppUpdates;
 import com.newtube.mobile.ui.playback.MiniPlayerBridge;
@@ -131,13 +132,13 @@ public class MobileBrowseActivity extends MobileActivity
      */
     private static final int[] PREFERRED_SECTION_IDS = {
             MediaGroup.TYPE_HOME,
-            MediaGroup.TYPE_SUBSCRIPTIONS,
+            MediaGroup.TYPE_SHORTS,
             MediaGroup.TYPE_HISTORY,
             VideoDownloads.SECTION_ID,
     };
     private static final int[] PREFERRED_SECTION_TITLE_RES = {
             R.string.header_home,
-            R.string.header_subscriptions,
+            R.string.header_shorts,
             R.string.header_history,
             R.string.header_downloads,
     };
@@ -1051,8 +1052,8 @@ public class MobileBrowseActivity extends MobileActivity
      * Rebuild the panel's section list, grouped like the official You page: the user's own
      * content first (Playlists, My videos, Channels, ...), then the discovery feeds under an
      * "Explore" label, then Settings behind a divider. Sections shown in the bottom nav (and
-     * Settings/Shorts) are excluded - Settings gets its own trailing row, and NewTube has no
-     * Shorts (see ShortsFilter). Long-press on a section row opens the section-management menu
+     * Settings/Shorts) are excluded - Settings gets its own trailing row, and Shorts has the nav
+     * tab plus its own full-screen feed. Long-press on a section row opens the section-management menu
      * (the old drawer rows' "..." overflow).
      */
     private void rebuildYouRows() {
@@ -1268,6 +1269,14 @@ public class MobileBrowseActivity extends MobileActivity
         if (sectionId == MediaGroup.TYPE_SETTINGS) {
             syncNavHighlight(mCurrentSectionId); // keep highlight on the real current section
             openSettings();
+            return;
+        }
+
+        // Shorts has its own full-screen vertical feed (the nav tab's destination), never the
+        // grid: the grid would filter every Short out again (ShortsFilter) and can't page them.
+        if (sectionId == MediaGroup.TYPE_SHORTS) {
+            syncNavHighlight(mCurrentSectionId);
+            startActivity(MobileShortsActivity.intent(this));
             return;
         }
 
@@ -1730,8 +1739,8 @@ public class MobileBrowseActivity extends MobileActivity
         switch (sectionId) {
             case MediaGroup.TYPE_HOME:
                 return R.drawable.ic_nav_home;
-            case MediaGroup.TYPE_SUBSCRIPTIONS:
-                return R.drawable.ic_nav_subscriptions;
+            case MediaGroup.TYPE_SHORTS:
+                return R.drawable.ic_nav_shorts;
             case MediaGroup.TYPE_HISTORY:
                 return R.drawable.ic_nav_history;
             case VideoDownloads.SECTION_ID:
@@ -2092,6 +2101,14 @@ public class MobileBrowseActivity extends MobileActivity
                 return;
             }
 
+            // Same route as onSectionChosen(): a presenter boot/fallback selection on Shorts
+            // opens the dedicated feed, never the filtered grid.
+            if (section.getId() == MediaGroup.TYPE_SHORTS) {
+                syncNavHighlight(mCurrentSectionId);
+                startActivity(MobileShortsActivity.intent(this));
+                return;
+            }
+
             hideYouPanel();
             boolean switched = mCurrentSectionId != section.getId();
             mCurrentSectionId = section.getId();
@@ -2424,8 +2441,9 @@ public class MobileBrowseActivity extends MobileActivity
     /**
      * Browse sections are video feeds, not discovery results. YouTube occasionally injects a
      * channel-shaped recommendation into Home/Trending; rendering that with the shared search
-     * adapter creates an avatar-only row in the middle of otherwise full-thumbnail cards. NewTube
-     * has no Shorts, so none are shown in any section ({@link ShortsFilter}). Keep true playlists
+     * adapter creates an avatar-only row in the middle of otherwise full-thumbnail cards. Shorts
+     * stay filtered from every grid ({@link ShortsFilter}); only the dedicated Shorts feed shows
+     * them. Keep true playlists
      * (which use a similar service shape), and leave channel discovery to Search.
      */
     private static List<Video> visibleFeedItems(List<Video> videos) {
