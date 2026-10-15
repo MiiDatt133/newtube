@@ -80,7 +80,7 @@ import io.reactivex.rxjava3.disposables.Disposable;
 public final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayout.Callback,
         CommentComposer.Callback {
 
-    interface Host {
+    public interface Host {
         /** A timestamp in a comment on the video that is playing. */
         void onCommentTimestamp(long positionMs);
 
