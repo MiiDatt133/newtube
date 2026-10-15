@@ -31,6 +31,9 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
 
         /** The surface the player may be using belongs to a page that is going away. */
         void onShortSurfaceLost(TextureView textureView);
+
+        /** A tap (no drag) landed on a page: the screen toggles play/pause. */
+        void onShortTapped();
     }
 
     private final List<Video> mItems = new ArrayList<>();
@@ -43,6 +46,19 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
 
     public Video itemAt(int position) {
         return position >= 0 && position < mItems.size() ? mItems.get(position) : null;
+    }
+
+    /** The page carrying this video, or {@link RecyclerView#NO_POSITION}. */
+    public int indexOf(String videoId) {
+        if (videoId == null) {
+            return RecyclerView.NO_POSITION;
+        }
+        for (int i = 0; i < mItems.size(); i++) {
+            if (videoId.equals(mItems.get(i).videoId)) {
+                return i;
+            }
+        }
+        return RecyclerView.NO_POSITION;
     }
 
     /** Replace the whole list (initial load / reload); append is {@link #append}. */
@@ -108,6 +124,7 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
             title = itemView.findViewById(R.id.mobile_short_title);
             channel = itemView.findViewById(R.id.mobile_short_channel);
             texture.setSurfaceTextureListener(this);
+            itemView.setOnClickListener(v -> mSurfaceHost.onShortTapped());
             itemView.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> applyCrop());
         }
 

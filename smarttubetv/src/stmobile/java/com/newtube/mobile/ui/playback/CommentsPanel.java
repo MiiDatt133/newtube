@@ -77,7 +77,7 @@ import io.reactivex.rxjava3.disposables.Disposable;
  * post shows at once - on top of the list or the thread, and on top of any order or replies page
  * loaded later - and what they closed without posting stays as a draft until the video changes.</p>
  */
-final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayout.Callback,
+public final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayout.Callback,
         CommentComposer.Callback {
 
     interface Host {
@@ -259,7 +259,7 @@ final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayo
     @Nullable
     private PopupWindow mCommentMenu;
 
-    CommentsPanel(FragmentActivity activity, CommentsPanelLayout layout, Host host) {
+    public CommentsPanel(FragmentActivity activity, CommentsPanelLayout layout, Host host) {
         mActivity = activity;
         mHost = host;
         mLayout = layout;
@@ -509,7 +509,7 @@ final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayo
     }
 
     /** The video's metadata named where its comments are (null keys = comments are off). */
-    void setSource(@Nullable String videoId, @Nullable String topKey, @Nullable String newestKey,
+    public void setSource(@Nullable String videoId, @Nullable String topKey, @Nullable String newestKey,
                    @Nullable String count) {
         if (!Helpers.equals(videoId, mVideoId)) {
             onVideoChanged(videoId);
@@ -558,7 +558,7 @@ final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayo
     // Open / close
     // ---------------------------------------------------------------------------------
 
-    void open() {
+    public void open() {
         Feed feed = currentFeed();
         if (feed == null || mLayout.isOpen() || mReleased) {
             return;
@@ -588,7 +588,7 @@ final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayo
         mHost.onCommentsPanelShown(true);
     }
 
-    void close() {
+    public void close() {
         dismissSortMenu(false);
         mLayout.close();
     }
@@ -654,7 +654,7 @@ final class CommentsPanel implements CommentsAdapter.Listener, CommentsPanelLayo
     }
 
     /** The activity is going: nothing here may start again (requests, fades, posted work). */
-    void release() {
+    public void release() {
         mReleased = true;
         dismissSortMenu(false);
         dismissCommentMenu();

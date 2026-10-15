@@ -18,12 +18,13 @@ import io.reactivex.rxjava3.core.Observable;
  * unless a later tap for the same video is already queued - that one decides instead. Callbacks
  * arrive on the thread the calls deliver on (RxHelper: the main thread), where writes come from.</p>
  */
-final class RatingWriter {
+/** NEWTUBE(shorts): public so the Shorts rail can reuse it; same queue/rollback semantics. */
+public final class RatingWriter {
     static final int NONE = 0;
     static final int LIKE = 1;
     static final int DISLIKE = 2;
 
-    interface Rollback {
+    public interface Rollback {
         /** Put {@code videoId}'s rating on screen back to {@code rating}; the write failed. */
         void to(String videoId, int rating);
     }
@@ -52,7 +53,7 @@ final class RatingWriter {
      * @param after  the rating this write asks YouTube for
      * @param call   the not-yet-subscribed service call
      */
-    void write(String videoId, int before, int after, Observable<Void> call, Rollback rollback) {
+    public void write(String videoId, int before, int after, Observable<Void> call, Rollback rollback) {
         if (!mConfirmed.containsKey(videoId)) {
             mConfirmed.put(videoId, before);
         }

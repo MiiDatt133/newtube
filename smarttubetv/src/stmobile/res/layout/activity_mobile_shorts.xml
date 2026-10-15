@@ -61,6 +61,103 @@
         android:src="@drawable/action_sound_on"
         android:tint="@color/mobile_player_on_video" />
 
+    <!-- The action rail (like / dislike / comment / share), YouTube Shorts style, above the mute
+         button. Counts appear under their icon once the video's metadata lands. -->
+    <LinearLayout
+        android:id="@+id/mobile_shorts_rail"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="148dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <ImageButton
+            android:id="@+id/mobile_shorts_like"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_mini_scrim_circle"
+            android:contentDescription="@string/mobile_watch_like"
+            android:padding="10dp"
+            android:src="@drawable/ic_watch_thumb_up_outline"
+            android:tint="@color/mobile_player_on_video" />
+
+        <TextView
+            android:id="@+id/mobile_shorts_like_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
+            android:textColor="@color/mobile_player_on_video"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/mobile_shorts_dislike"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_mini_scrim_circle"
+            android:contentDescription="@string/mobile_watch_dislike"
+            android:padding="10dp"
+            android:src="@drawable/ic_watch_thumb_down_outline"
+            android:tint="@color/mobile_player_on_video" />
+
+        <ImageButton
+            android:id="@+id/mobile_shorts_comment"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_mini_scrim_circle"
+            android:contentDescription="@string/mobile_comments_title"
+            android:padding="10dp"
+            android:src="@drawable/ic_watch_comment"
+            android:tint="@color/mobile_player_on_video" />
+
+        <TextView
+            android:id="@+id/mobile_shorts_comment_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:shadowColor="#80000000"
+            android:shadowRadius="2"
+            android:textColor="@color/mobile_player_on_video"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/mobile_shorts_share"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_mini_scrim_circle"
+            android:contentDescription="@string/mobile_watch_share"
+            android:padding="10dp"
+            android:src="@drawable/ic_watch_share"
+            android:tint="@color/mobile_player_on_video" />
+    </LinearLayout>
+
+    <!-- Tap-to-pause feedback: shown while the user has the Short paused. Not clickable, so
+         taps fall through to the pager. -->
+    <ImageView
+        android:id="@+id/mobile_shorts_center_icon"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:alpha="0.9"
+        android:contentDescription="@string/mobile_shorts_paused"
+        android:src="@drawable/ic_player_pause"
+        android:tint="@color/mobile_player_on_video"
+        android:visibility="gone" />
+
     <ProgressBar
         android:id="@+id/mobile_shorts_skeleton"
         android:layout_width="40dp"
@@ -95,5 +192,9 @@
             android:text="@string/mobile_signin_retry_button"
             android:visibility="gone" />
     </LinearLayout>
+
+    <!-- Comments (NEWTUBE(comments-panel)): above every Shorts chrome element, so the panel
+         covers the rail and the back button while open; invisible (no touches) while closed. -->
+    <include layout="@layout/mobile_comments_panel" />
 
 </FrameLayout>

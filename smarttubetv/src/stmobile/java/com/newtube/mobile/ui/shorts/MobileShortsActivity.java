@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -26,8 +28,13 @@ import androidx.recyclerview.widget.PagerSnapHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
+import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
+import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.RatingWriter;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEngineEventListener;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerUiEventListener;
@@ -37,12 +44,15 @@ import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.NetPath;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
+import com.liskovsoft.youtubeapi.service.YouTubeSignInService;
 import com.liskovsoft.youtubeapi.videoinfo.V2.VideoInfoService;
 import com.newtube.mobile.player.Media3PlayerController;
 import com.newtube.mobile.player.Media3PlayerInitializer;
 import com.newtube.mobile.ui.common.MobileActivity;
 import com.newtube.mobile.ui.common.ShortsFilter;
+import com.newtube.mobile.ui.playback.CommentsPanel;
 
+import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.disposables.Disposable;
 
 /**
@@ -77,6 +87,13 @@ public class MobileShortsActivity extends MobileActivity implements
     private ProgressBar mProgress;
     private ImageButton mBackButton;
     private ImageButton mMuteButton;
+    private ImageButton mLikeButton;
+    private ImageButton mDislikeButton;
+    private ImageButton mCommentButton;
+    private ImageButton mShareButton;
+    private TextView mLikeCount;
+    private TextView mCommentCount;
+    private ImageView mCenterIcon;
     private ProgressBar mSkeleton;
     private View mMessageContainer;
     private TextView mMessage;
@@ -88,6 +105,13 @@ public class MobileShortsActivity extends MobileActivity implements
 
     private ShortsFeedLoader mLoader;
     private Disposable mResolveAction;
+    private Disposable mMetadataAction;
+
+    /** The rail's writes: one at a time in tap order, rollback on failure (like the watch page). */
+    private final RatingWriter mRatingWriter = new RatingWriter();
+    private CommentsPanel mCommentsPanel;
+    @Nullable private String mCommentsKey;
+    private int mLikeStatus = MediaItemMetadata.LIKE_STATUS_INDIFFERENT;
 
     @Nullable private Video mCurrentVideo;
     @Nullable private TextureView mAttachedSurface;
@@ -98,6 +122,10 @@ public class MobileShortsActivity extends MobileActivity implements
     private int mOpenAttempts;
     private boolean mMuted;
     private boolean mFeedShown;
+    /** The person tapped the video to pause it; swipes, page changes and resume clear it. */
+    private boolean mUserPaused;
+    /** The comment panel covered the video and paused it; closing it resumes. */
+    private boolean mPanelPaused;
     @Nullable private String mAccountKey;
 
     private final Runnable mTicker = this::onTick;
@@ -183,6 +211,13 @@ public class MobileShortsActivity extends MobileActivity implements
         mProgress = findViewById(R.id.mobile_shorts_progress);
         mBackButton = findViewById(R.id.mobile_shorts_back);
         mMuteButton = findViewById(R.id.mobile_shorts_mute);
+        mLikeButton = findViewById(R.id.mobile_shorts_like);
+        mDislikeButton = findViewById(R.id.mobile_shorts_dislike);
+        mCommentButton = findViewById(R.id.mobile_shorts_comment);
+        mShareButton = findViewById(R.id.mobile_shorts_share);
+        mLikeCount = findViewById(R.id.mobile_shorts_like_count);
+        mCommentCount = findViewById(R.id.mobile_shorts_comment_count);
+        mCenterIcon = findViewById(R.id.mobile_shorts_center_icon);
         mSkeleton = findViewById(R.id.mobile_shorts_skeleton);
         mMessageContainer = findViewById(R.id.mobile_shorts_message_container);
         mMessage = findViewById(R.id.mobile_shorts_message);
@@ -193,6 +228,7 @@ public class MobileShortsActivity extends MobileActivity implements
 
         mLoader = new ShortsFeedLoader(YouTubeServiceManager.instance().getContentService(), this);
         mAccountKey = currentAccountKey();
+        mCommentsPanel = new CommentsPanel(this, findViewById(R.id.mobile_comments_panel), mCommentsHost);
 
         mBackButton.setOnClickListener(v -> finish());
         mRetry.setOnClickListener(v -> {
@@ -204,6 +240,11 @@ public class MobileShortsActivity extends MobileActivity implements
             }
         });
         mMuteButton.setOnClickListener(v -> toggleMute());
+        mLikeButton.setOnClickListener(v -> toggleRating(true));
+        mDislikeButton.setOnClickListener(v -> toggleRating(false));
+        mCommentButton.setOnClickListener(v -> openComments());
+        mShareButton.setOnClickListener(v -> shareCurrent());
+        updateRatingButtons();
 
         applyChromeInsets();
         mLoader.loadInitial();
@@ -255,6 +296,17 @@ public class MobileShortsActivity extends MobileActivity implements
             mMuteButton.setPadding(mMuteButton.getPaddingLeft(), mMuteButton.getPaddingTop(),
                     mMuteButton.getPaddingRight(), insets.bottom + 4 * pad);
             mProgress.setTranslationY(-insets.bottom);
+            View rail = findViewById(R.id.mobile_shorts_rail);
+            if (rail != null) {
+                rail.setTranslationY(-insets.bottom);
+            }
+            // The comments panel is a full-screen sheet here (on the watch page it sits under the
+            // video): keep its header below the status bar and its list above the nav bar.
+            View panel = findViewById(R.id.mobile_comments_panel);
+            if (panel != null) {
+                panel.setPadding(panel.getPaddingLeft(), insets.top,
+                        panel.getPaddingRight(), insets.bottom);
+            }
             return windowInsets;
         });
         ViewCompat.requestApplyInsets(root);
@@ -343,6 +395,8 @@ public class MobileShortsActivity extends MobileActivity implements
             return;
         }
         mCurrentPosition = position;
+        mUserPaused = false; // a fresh page starts playing, whatever the last page did
+        updateCenterIcon();
 
         Video video = mAdapter.itemAt(position);
         attachPageSurface(position);
@@ -427,8 +481,15 @@ public class MobileShortsActivity extends MobileActivity implements
         mOpenGeneration++;
         hideMessage();
         mBuffer.setVisibility(View.VISIBLE);
+        mUserPaused = false;
+        updateCenterIcon();
+        resetRatingUi();
+        // The panel's feeds belong to the previous video; a stale set must never show under the
+        // new one (its own source lands with the metadata below).
+        mCommentsPanel.setSource(null, null, null, null);
         MediaServiceManager.noteChannel(video);
         resolveCurrent();
+        loadMetadata();
     }
 
     private void retryCurrentVideo() {
@@ -482,7 +543,7 @@ public class MobileShortsActivity extends MobileActivity implements
             showPlaybackError(info.getPlayabilityReason());
             return;
         }
-        mPlayer.setPlayWhenReady(true);
+        mPlayer.setPlayWhenReady(!mUserPaused);
     }
 
     private void onResolveError(int generation, Video video, Throwable error) {
@@ -541,6 +602,206 @@ public class MobileShortsActivity extends MobileActivity implements
     }
 
     // ---------------------------------------------------------------------------------
+    // Tap-to-pause, action rail, comments
+    // ---------------------------------------------------------------------------------
+
+    /** A tap (not a swipe) on the page: YouTube Shorts' play/pause. */
+    @Override
+    public void onShortTapped() {
+        if (mPlayer == null || mCurrentVideo == null) {
+            return;
+        }
+        boolean play = !mPlayer.getPlayWhenReady();
+        mUserPaused = !play;
+        mPlayer.setPlayWhenReady(play);
+        updateCenterIcon();
+    }
+
+    private void updateCenterIcon() {
+        mCenterIcon.setVisibility(mUserPaused ? View.VISIBLE : View.GONE);
+    }
+
+    /** Like/dislike through the watch page's queued writer: optimistic UI, rollback on failure. */
+    private void toggleRating(boolean like) {
+        Video video = mCurrentVideo;
+        if (video == null || video.videoId == null) {
+            return;
+        }
+        if (!YouTubeSignInService.instance().isSigned()) {
+            MessageHelpers.showMessage(this, R.string.msg_signed_users_only);
+            return;
+        }
+        final int before = mLikeStatus;
+        final int after;
+        if (like) {
+            after = before == MediaItemMetadata.LIKE_STATUS_LIKE
+                    ? MediaItemMetadata.LIKE_STATUS_INDIFFERENT
+                    : MediaItemMetadata.LIKE_STATUS_LIKE;
+        } else {
+            after = before == MediaItemMetadata.LIKE_STATUS_DISLIKE
+                    ? MediaItemMetadata.LIKE_STATUS_INDIFFERENT
+                    : MediaItemMetadata.LIKE_STATUS_DISLIKE;
+        }
+        if (after == before) {
+            return;
+        }
+        MediaItemService service = YouTubeServiceManager.instance().getMediaItemService();
+        MediaItem item = video.mediaItem != null ? video.mediaItem : video.toMediaItem();
+        Observable<Void> call;
+        if (like) {
+            call = after == MediaItemMetadata.LIKE_STATUS_LIKE
+                    ? service.setLikeObserve(item) : service.removeLikeObserve(item);
+        } else {
+            call = after == MediaItemMetadata.LIKE_STATUS_DISLIKE
+                    ? service.setDislikeObserve(item) : service.removeDislikeObserve(item);
+        }
+        mLikeStatus = after;
+        updateRatingButtons();
+        mRatingWriter.write(video.videoId, before, after, call, (videoId, rating) -> {
+            if (mCurrentVideo == null || isFinishing() || isDestroyed()
+                    || !videoId.equals(mCurrentVideo.videoId)) {
+                return; // the screen moved on; the next video's metadata shows the truth
+            }
+            mLikeStatus = rating;
+            updateRatingButtons();
+            MessageHelpers.showMessage(MobileShortsActivity.this,
+                    R.string.mobile_rating_not_saved);
+        });
+    }
+
+    private void updateRatingButtons() {
+        boolean liked = mLikeStatus == MediaItemMetadata.LIKE_STATUS_LIKE;
+        boolean disliked = mLikeStatus == MediaItemMetadata.LIKE_STATUS_DISLIKE;
+        mLikeButton.setImageResource(liked ? R.drawable.ic_watch_thumb_up
+                : R.drawable.ic_watch_thumb_up_outline);
+        // YouTube's "liked" blue; white on the rail otherwise.
+        mLikeButton.setColorFilter(liked ? 0xFF3EA6FF : getColor(R.color.mobile_player_on_video));
+        mDislikeButton.setImageResource(disliked ? R.drawable.ic_watch_thumb_down
+                : R.drawable.ic_watch_thumb_down_outline);
+        mDislikeButton.setColorFilter(getColor(R.color.mobile_player_on_video));
+    }
+
+    private void resetRatingUi() {
+        mLikeStatus = MediaItemMetadata.LIKE_STATUS_INDIFFERENT;
+        mCommentsKey = null;
+        mLikeCount.setText(null);
+        mLikeCount.setVisibility(View.GONE);
+        mCommentCount.setText(null);
+        mCommentCount.setVisibility(View.GONE);
+        updateRatingButtons();
+    }
+
+    private void openComments() {
+        if (mCommentsKey == null || mCommentsPanel == null) {
+            return; // metadata has not named the comments yet (or the video has none)
+        }
+        mCommentsPanel.open();
+    }
+
+    private void shareCurrent() {
+        Video video = mCurrentVideo;
+        if (video == null || video.videoId == null) {
+            return;
+        }
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_TEXT, "https://youtu.be/" + video.videoId);
+        startActivity(Intent.createChooser(send, getString(R.string.mobile_watch_share_subject)));
+    }
+
+    private final CommentsPanel.Host mCommentsHost = new CommentsPanel.Host() {
+        @Override
+        public void onCommentTimestamp(long positionMs) {
+            if (mPlayer != null
+                    && mPlayer.getDuration() != androidx.media3.common.C.TIME_UNSET
+                    && positionMs <= mPlayer.getDuration()) {
+                mPlayer.seekTo(positionMs);
+            }
+        }
+
+        @Override
+        public void onCommentVideoLink(String videoId) {
+            int index = mAdapter.indexOf(videoId);
+            if (index != RecyclerView.NO_POSITION && mCommentsPanel != null) {
+                mCommentsPanel.close();
+                mPager.smoothScrollToPosition(index);
+            }
+        }
+
+        @Override
+        public void onCommentsPanelShown(boolean shown) {
+            if (mPlayer == null) {
+                return;
+            }
+            if (shown) {
+                // Covering the Short pauses it; closing resumes it unless the person paused it.
+                mPanelPaused = !mUserPaused && mPlayer.getPlayWhenReady();
+                if (mPanelPaused) {
+                    mPlayer.setPlayWhenReady(false);
+                }
+            } else if (mPanelPaused) {
+                mPanelPaused = false;
+                if (!mUserPaused) {
+                    mPlayer.setPlayWhenReady(true);
+                }
+            }
+        }
+    };
+
+    // ---------------------------------------------------------------------------------
+    // Metadata (rating state + comments source)
+    // ---------------------------------------------------------------------------------
+
+    /**
+     * The engine's /next for this Short: like status and counts for the rail, and the comments
+     * keys the panel needs. Its own disposable (not MediaServiceManager's shared one) so a Shorts
+     * fetch can never cancel a metadata load the docked watch page is waiting on.
+     */
+    private void loadMetadata() {
+        final int generation = mOpenGeneration;
+        final Video video = mCurrentVideo;
+        if (video == null || video.videoId == null) {
+            return;
+        }
+        RxDispose(mMetadataAction);
+        MediaItemService service = YouTubeServiceManager.instance().getMediaItemService();
+        Observable<MediaItemMetadata> observable = video.mediaItem != null
+                ? service.getMetadataObserve(video.mediaItem)
+                : service.getMetadataObserve(video.videoId, video.getPlaylistId(),
+                        video.playlistIndex, video.playlistParams);
+        mMetadataAction = observable.subscribe(
+                metadata -> onVideoMetadata(generation, video, metadata),
+                error -> NetPath.log("shorts metadata error video=" + video.videoId + " "
+                        + error.getMessage()));
+    }
+
+    private void onVideoMetadata(int generation, Video video, MediaItemMetadata metadata) {
+        if (generation != mOpenGeneration || mCurrentVideo != video
+                || isFinishing() || isDestroyed()) {
+            return;
+        }
+        video.sync(metadata);
+        mLikeStatus = metadata.getLikeStatus();
+        updateRatingButtons();
+
+        String likeCount = metadata.getLikeCount();
+        mLikeCount.setText(likeCount);
+        mLikeCount.setVisibility(TextUtils.isEmpty(likeCount) ? View.GONE : View.VISIBLE);
+
+        mCommentsKey = metadata.getCommentsKey();
+        String commentsCount = mCommentsKey != null ? metadata.getCommentsCount() : null;
+        mCommentCount.setText(commentsCount);
+        mCommentCount.setVisibility(TextUtils.isEmpty(commentsCount) ? View.GONE : View.VISIBLE);
+        mCommentsPanel.setSource(video.videoId, mCommentsKey, metadata.getNewestCommentsKey(),
+                commentsCount);
+
+        if (mCurrentPosition != RecyclerView.NO_POSITION
+                && mAdapter.itemAt(mCurrentPosition) == video) {
+            mAdapter.notifyItemChanged(mCurrentPosition); // title/author enrichment
+        }
+    }
+
+    // ---------------------------------------------------------------------------------
     // Mute + ticker + lifecycle
     // ---------------------------------------------------------------------------------
 
@@ -575,7 +836,7 @@ public class MobileShortsActivity extends MobileActivity implements
             mAccountKey = account;
             reloadFeed();
         }
-        if (mPlayer != null && mCurrentVideo != null) {
+        if (mPlayer != null && mCurrentVideo != null && !mUserPaused) {
             mPlayer.setPlayWhenReady(true);
         }
         mPager.postDelayed(mTicker, TICK_MS);
@@ -598,6 +859,12 @@ public class MobileShortsActivity extends MobileActivity implements
         }
         RxDispose(mResolveAction);
         mResolveAction = null;
+        RxDispose(mMetadataAction);
+        mMetadataAction = null;
+        if (mCommentsPanel != null) {
+            mCommentsPanel.release();
+            mCommentsPanel = null;
+        }
         if (mPlayerController != null) {
             mPlayerController.release(); // stops, clears and releases the single player
             mPlayerController = null;
@@ -613,6 +880,14 @@ public class MobileShortsActivity extends MobileActivity implements
         mOpenGeneration++;
         RxDispose(mResolveAction);
         mResolveAction = null;
+        RxDispose(mMetadataAction);
+        mMetadataAction = null;
+        mUserPaused = false;
+        updateCenterIcon();
+        resetRatingUi();
+        if (mCommentsPanel != null) {
+            mCommentsPanel.setSource(null, null, null, null);
+        }
         mAdapter.submit(mLoader.items());
         hideMessage();
         setSkeletonVisible(true);

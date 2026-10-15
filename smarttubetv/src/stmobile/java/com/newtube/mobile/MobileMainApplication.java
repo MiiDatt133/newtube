@@ -38,6 +38,7 @@ import com.newtube.mobile.ui.playback.MobilePlaybackActivity;
 import com.newtube.mobile.ui.playback.SystemPipBridge;
 import com.newtube.mobile.ui.search.MobileSearchActivity;
 import com.newtube.mobile.ui.settings.MobileSettingsActivity;
+import com.newtube.mobile.ui.shorts.MobileShortsActivity;
 import com.newtube.mobile.ui.signin.MobileSignInActivity;
 import com.newtube.mobile.ui.webbrowser.MobileWebBrowserActivity;
 
@@ -1003,6 +1004,11 @@ public class MobileMainApplication extends MainApplication {
         // only gives it Home as its parent - addTop() of a screen with no parent mapping clears
         // ViewManager's stack, and Back from Settings then left the app.
         viewManager.register(MobileSettingsActivity.class, MobileSettingsActivity.class, MobileBrowseActivity.class);
+
+        // Shorts (the bottom-nav destination, opened directly from Browse): parent = Home, same
+        // reason as Settings - addTop() of a screen with no parent mapping clears ViewManager's
+        // stack, and Back from Shorts then read "no parent" as "leave the app".
+        viewManager.register(MobileShortsActivity.class, MobileShortsActivity.class, MobileBrowseActivity.class);
 
         viewManager.setRoot(MobileBrowseActivity.class);
     }

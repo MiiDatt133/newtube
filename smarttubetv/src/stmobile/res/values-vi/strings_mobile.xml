@@ -8,4 +8,12 @@
     <string name="mobile_shorts_unmute">Bật tiếng</string>
     <string name="mobile_shorts_empty">Hiện chưa có Shorts nào</string>
     <string name="mobile_shorts_load_error">Không tải được Shorts.</string>
+    <string name="mobile_shorts_paused">Đã tạm dừng</string>
+    <!-- The Shorts rail reuses the watch page's action labels; they are untranslated there,
+         so they are Vietnamese here. -->
+    <string name="mobile_watch_like">Thích</string>
+    <string name="mobile_watch_dislike">Không thích</string>
+    <string name="mobile_watch_share">Chia sẻ</string>
+    <string name="mobile_watch_share_subject">Xem video này</string>
+    <string name="mobile_comments_title">Bình luận</string>
 </resources>
