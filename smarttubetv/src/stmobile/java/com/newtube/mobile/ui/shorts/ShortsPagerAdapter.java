@@ -64,6 +64,11 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
     }
 
     @Override
+    public int getItemCount() {
+        return mItems.size();
+    }
+
+    @Override
     public long getItemId(int position) {
         Video video = itemAt(position);
         return video != null && video.videoId != null ? video.videoId.hashCode() : position;

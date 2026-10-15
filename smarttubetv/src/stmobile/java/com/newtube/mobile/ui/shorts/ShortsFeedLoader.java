@@ -66,6 +66,17 @@ public final class ShortsFeedLoader {
         startLoad(true);
     }
 
+    /** The first page when nothing has started yet; later calls are no-ops. */
+    public void loadInitial() {
+        if (mState.needsInitial()) {
+            startLoad(true);
+        }
+    }
+
+    public boolean hasEnded() {
+        return mState.hasEnded();
+    }
+
     /** Fetch the next page when the feed has one and none is in flight. */
     public void loadMore() {
         if (mState.isLoading() || !mState.needsMore()) {

@@ -2,16 +2,11 @@ package com.newtube.mobile.ui.shorts;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import com.liskovsoft.mediaserviceinterfaces.ContentService;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
-import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
-import com.liskovsoft.sharedutils.rx.RxHelper;
 
 import org.junit.After;
 import org.junit.Before;
@@ -20,31 +15,35 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.ConscryptMode;
-import org.mockito.Mockito;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.subjects.PublishSubject;
 
-/** NEWTUBE(shorts): unit tests for the feed loader — generation-based stale rejection,
- *  null-result-as-ended, lifecycle. */
+/**
+ * NEWTUBE(shorts): unit tests for the feed loader — lifecycle (initial/continuation/reload),
+ * generation-based stale rejection, and the engine's "fromNullable result is null" exhaustion
+ * reported as end-of-feed rather than an error. ContentService is a dynamic-proxy fake:
+ * no Mockito in this module's test classpath.
+ */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28, manifest = Config.NONE, application = android.app.Application.class)
 @ConscryptMode(ConscryptMode.Mode.OFF)
 public class ShortsFeedLoaderTest {
 
-    private ContentService mContentService;
+    private FakeContentService mService;
     private TestCallback mCallback;
     private ShortsFeedLoader mLoader;
 
     @Before
     public void setUp() {
-        mContentService = Mockito.mock(ContentService.class);
+        mService = new FakeContentService();
         mCallback = new TestCallback();
-        mLoader = new ShortsFeedLoader(mContentService, mCallback);
+        mLoader = new ShortsFeedLoader(mService.instance(), mCallback);
     }
 
     @After
@@ -53,9 +52,8 @@ public class ShortsFeedLoaderTest {
     }
 
     @Test
-    public void initialLoadEmitsPage() {
-        MediaGroup group = groupWithItems("a", "b", "c");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(group));
+    public void initialLoadEmitsPageAndEndsWithoutContinuation() {
+        mService.mShortsResult = Observable.just(groupWithItems(null, "a", "b", "c"));
 
         mLoader.loadInitial();
 
@@ -63,138 +61,173 @@ public class ShortsFeedLoaderTest {
         assertEquals(1, mCallback.pagesReceived.size());
         assertEquals(0, mCallback.pagesReceived.get(0).firstNewIndex);
         assertEquals(3, mCallback.pagesReceived.get(0).size);
-        assertFalse(mLoader.isLoading());
-        assertFalse(mLoader.hasMore()); // no continuation key -> end
+        assertTrue(mCallback.endedReceived);
+        assertFalse(mLoader.hasMore());
     }
 
     @Test
     public void continuationLoadAppendsPage() {
-        MediaGroup first = groupWithItems("a", "b");
-        first.setNextPageKey("page2");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(first));
-
+        mService.mShortsResult = Observable.just(groupWithItems("page2", "a", "b"));
         mLoader.loadInitial();
-        assertFalse(mLoader.isLoading());
 
-        MediaGroup second = groupWithItems("c", "d");
-        Mockito.when(mContentService.continueGroupObserve(Mockito.any(MediaGroup.class)))
-                .thenReturn(Observable.just(second));
-
+        mService.mContinueResult = Observable.just(groupWithItems("page3", "c", "d"));
         mLoader.loadMore();
-        assertFalse(mLoader.isLoading());
 
         assertEquals(2, mCallback.pagesReceived.size());
         assertEquals(2, mCallback.pagesReceived.get(1).firstNewIndex); // "c" at index 2
         assertEquals(4, mCallback.pagesReceived.get(1).size);
+        assertEquals(1, mService.mContinueCalls.get());
     }
 
     @Test
     public void nullContinuationResultIsEndedNotError() {
-        MediaGroup first = groupWithItems("a");
-        first.setNextPageKey("page2");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(first));
-
+        mService.mShortsResult = Observable.just(groupWithItems("page2", "a"));
         mLoader.loadInitial();
 
-        // Engine returns null for exhausted continuation -> onError with IllegalStateException
-        Mockito.when(mContentService.continueGroupObserve(Mockito.any(MediaGroup.class)))
-                .thenReturn(Observable.error(
-                        new IllegalStateException("fromNullable result is null")));
-
+        // The engine reports an exhausted continuation as a null result, i.e. an error.
+        mService.mContinueResult = Observable.error(
+                new IllegalStateException("fromNullable result is null"));
         mLoader.loadMore();
 
         assertFalse(mCallback.errorReceived);
         assertTrue(mCallback.endedReceived);
         assertTrue(mLoader.hasEnded());
+        assertFalse(mLoader.hasMore());
     }
 
     @Test
-    public void staleGenerationDropped() throws InterruptedException {
-        // First load is slow; second load cancels it
-        MediaGroup first = groupWithItems("a");
-        first.setNextPageKey("page2");
-        Observable<MediaGroup> slow = Observable.just(first)
-                .delay(java.util.concurrent.TimeUnit.MILLISECONDS, 50);
-
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(slow);
-
+    public void genuineContinuationErrorIsReportedAsError() {
+        mService.mShortsResult = Observable.just(groupWithItems("page2", "a"));
         mLoader.loadInitial();
-        assertTrue(mLoader.isLoading());
 
-        // Cancel by starting reload
-        mLoader.reload();
-        Thread.sleep(100); // let async settle
+        mService.mContinueResult = Observable.error(new RuntimeException("boom"));
+        mLoader.loadMore();
 
-        // The late answer from first load must be dropped (generation bumped)
-        assertFalse(mLoader.isLoading());
-        assertEquals(0, mCallback.pagesReceived.size()); // first load dropped
+        assertTrue(mCallback.errorReceived);
+        assertFalse(mCallback.endedReceived);
+        // Not ended: a retry may claim a fresh continuation load.
+        assertFalse(mLoader.hasEnded());
+        assertTrue(mLoader.hasMore());
     }
 
     @Test
-    public void cancelStopsInFlightLoad() {
-        MediaGroup group = groupWithItems("a");
-        Observable<MediaGroup> never = Observable.never();
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(never);
-
+    public void cancelStopsInFlightLoadAndDropsLateAnswer() {
+        PublishSubject<MediaGroup> inFlight = PublishSubject.create();
+        mService.mShortsResult = inFlight;
         mLoader.loadInitial();
         assertTrue(mLoader.isLoading());
 
         mLoader.cancel();
-
         assertFalse(mLoader.isLoading());
+
+        // A late landing from the cancelled generation must be dropped.
+        inFlight.onNext(groupWithItems(null, "late"));
+        inFlight.onComplete();
+
         assertEquals(0, mCallback.pagesReceived.size());
+        assertEquals(0, mLoader.items().size());
     }
 
     @Test
-    public void loadMoreNoOpWhenLoading() {
-        MediaGroup first = groupWithItems("a");
-        first.setNextPageKey("page2");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(first));
-        Mockito.when(mContentService.continueGroupObserve(Mockito.any(MediaGroup.class)))
-                .thenReturn(Observable.never());
-
+    public void reloadDropsThePreviousGenerationsAnswer() {
+        PublishSubject<MediaGroup> firstFeed = PublishSubject.create();
+        mService.mShortsResult = firstFeed;
         mLoader.loadInitial();
-        mLoader.loadMore(); // should no-op because first is still loading (never emits)
+        assertTrue(mLoader.isLoading());
 
-        // Only one subscribe should happen
-        Mockito.verify(mContentService, Mockito.times(1)).getShortsObserve();
-        Mockito.verify(mContentService, Mockito.never()).continueGroupObserve(Mockito.any());
-    }
-
-    @Test
-    public void loadMoreNoOpWhenEnded() {
-        MediaGroup first = groupWithItems("a");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(first));
-
-        mLoader.loadInitial();
-        mLoader.loadMore(); // ended, no continuation
-
-        assertTrue(mLoader.hasEnded());
-        Mockito.verify(mContentService, Mockito.never()).continueGroupObserve(Mockito.any());
-    }
-
-    @Test
-    public void reloadResetsState() {
-        MediaGroup first = groupWithItems("a", "b");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(first));
-
-        mLoader.loadInitial();
-        assertEquals(2, mLoader.items().size());
-
-        MediaGroup second = groupWithItems("c");
-        Mockito.when(mContentService.getShortsObserve()).thenReturn(Observable.just(second));
-
+        // The user leaves and returns (account switch): a fresh fetch starts...
+        PublishSubject<MediaGroup> secondFeed = PublishSubject.create();
+        mService.mShortsResult = secondFeed;
         mLoader.reload();
+
+        // ...then the OLD request lands. It belongs to a dead generation: dropped.
+        firstFeed.onNext(groupWithItems(null, "stale"));
+        firstFeed.onComplete();
+        assertEquals(0, mLoader.items().size());
+
+        // The current generation lands normally.
+        secondFeed.onNext(groupWithItems(null, "fresh"));
+        secondFeed.onComplete();
         assertEquals(1, mLoader.items().size());
-        assertEquals("c", mLoader.items().get(0).videoId);
+        assertEquals("fresh", mLoader.items().get(0).videoId);
     }
 
-    /** Test callback capturing events. */
-    private static class TestCallback implements ShortsFeedLoader.Callback {
+    @Test
+    public void loadMoreNoOpWhenLoadingOrEnded() {
+        mService.mShortsResult = Observable.never();
+        mLoader.loadInitial();
+        mLoader.loadMore(); // in flight: no second request
+        assertEquals(0, mService.mContinueCalls.get());
+
+        mLoader.cancel();
+        mService.mShortsResult = Observable.just(groupWithItems(null, "a")); // no key -> ended
+        mLoader.reload();
+        mLoader.loadMore(); // ended: no continuation request
+        assertEquals(0, mService.mContinueCalls.get());
+        assertTrue(mLoader.hasEnded());
+    }
+
+    @Test
+    public void initialErrorAllowsRetryThroughReload() {
+        mService.mShortsResult = Observable.error(new RuntimeException("network"));
+        mLoader.loadInitial();
+
+        assertTrue(mCallback.errorReceived);
+        assertEquals(0, mLoader.items().size());
+
+        mService.mShortsResult = Observable.just(groupWithItems(null, "a"));
+        mLoader.reload();
+
+        assertEquals(1, mLoader.items().size());
+        assertEquals("a", mLoader.items().get(0).videoId);
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Fakes
+    // ---------------------------------------------------------------------------------
+
+    /** ContentService proxy: replays configured observables, counts continuation calls. */
+    private static final class FakeContentService {
+        Observable<MediaGroup> mShortsResult = Observable.empty();
+        Observable<MediaGroup> mContinueResult = Observable.empty();
+        final AtomicInteger mContinueCalls = new AtomicInteger();
+
+        ContentService instance() {
+            return (ContentService) Proxy.newProxyInstance(
+                    ContentService.class.getClassLoader(),
+                    new Class<?>[]{ContentService.class},
+                    (proxy, method, args) -> {
+                        switch (method.getName()) {
+                            case "getShortsObserve":
+                                return mShortsResult;
+                            case "continueGroupObserve":
+                                mContinueCalls.incrementAndGet();
+                                return mContinueResult;
+                            case "toString":
+                                return "FakeContentService";
+                            case "hashCode":
+                                return System.identityHashCode(proxy);
+                            case "equals":
+                                return proxy == args[0];
+                            default:
+                                return defaultValue(method.getReturnType());
+                        }
+                    });
+        }
+
+        private static Object defaultValue(Class<?> type) {
+            if (type == boolean.class) return false;
+            if (type == int.class) return 0;
+            if (type == long.class) return 0L;
+            return null;
+        }
+    }
+
+    private static final class TestCallback implements ShortsFeedLoader.Callback {
         boolean loadingChanged;
         boolean errorReceived;
         boolean endedReceived;
-        List<PageInfo> pagesReceived = new ArrayList<>();
+        final List<PageInfo> pagesReceived = new ArrayList<>();
 
         @Override
         public void onFeedPage(int firstNewIndex, int size) {
@@ -216,46 +249,67 @@ public class ShortsFeedLoaderTest {
             endedReceived = true;
         }
 
-        private static class PageInfo {
+        private static final class PageInfo {
             final int firstNewIndex;
             final int size;
             PageInfo(int first, int sz) { firstNewIndex = first; size = sz; }
         }
     }
 
-    /** Helper: creates a MediaGroup with the given video IDs. */
-    private static MediaGroup groupWithItems(String... videoIds) {
+    /** A MediaGroup whose continuation key and items the test chooses. */
+    private static MediaGroup groupWithItems(String nextPageKey, String... videoIds) {
         List<MediaItem> items = new ArrayList<>();
         for (String id : videoIds) {
-            MediaItem item = (MediaItem) Proxy.newProxyInstance(
-                    MediaItem.class.getClassLoader(),
-                    new Class<?>[]{MediaItem.class},
-                    (proxy, method, args) -> {
-                        if ("getVideoId".equals(method.getName())) return id;
-                        if ("getTitle".equals(method.getName())) return id;
-                        Class<?> type = method.getReturnType();
-                        if (type == boolean.class) return false;
-                        if (type == int.class) return 0;
-                        if (type == long.class) return 0L;
-                        return null;
-                    });
-            items.add(item);
+            items.add(mediaItem(id));
         }
-        return mediaGroup(items);
-    }
-
-    private static MediaGroup mediaGroup(List<MediaItem> items) {
+        final String key = nextPageKey;
         return (MediaGroup) Proxy.newProxyInstance(
                 MediaGroup.class.getClassLoader(),
                 new Class<?>[]{MediaGroup.class},
                 (proxy, method, args) -> {
-                    if ("getMediaItems".equals(method.getName())) return items;
-                    if ("getNextPageKey".equals(method.getName())) return null;
-                    if ("setNextPageKey".equals(method.getName())) return null;
-                    Class<?> type = method.getReturnType();
-                    if (type == boolean.class) return false;
-                    if (type == int.class) return 0;
-                    return null;
+                    switch (method.getName()) {
+                        case "getMediaItems":
+                            return items;
+                        case "getNextPageKey":
+                            return key;
+                        case "getType":
+                            return MediaGroup.TYPE_SHORTS;
+                        case "isEmpty":
+                            return items.isEmpty();
+                        case "toString":
+                            return "FakeGroup";
+                        case "hashCode":
+                            return System.identityHashCode(proxy);
+                        case "equals":
+                            return proxy == args[0];
+                        default:
+                            return null;
+                    }
+                });
+    }
+
+    private static MediaItem mediaItem(String videoId) {
+        return (MediaItem) Proxy.newProxyInstance(
+                MediaItem.class.getClassLoader(),
+                new Class<?>[]{MediaItem.class},
+                (proxy, method, args) -> {
+                    switch (method.getName()) {
+                        case "getVideoId":
+                        case "getTitle":
+                            return videoId;
+                        case "hashCode":
+                            return videoId == null ? 0 : videoId.hashCode();
+                        case "equals":
+                            return proxy == args[0];
+                        default: {
+                            Class<?> type = method.getReturnType();
+                            if (type == boolean.class) return false;
+                            if (type == int.class) return 0;
+                            if (type == long.class) return 0L;
+                            if (type == float.class) return 0f;
+                            return null;
+                        }
+                    }
                 });
     }
 }

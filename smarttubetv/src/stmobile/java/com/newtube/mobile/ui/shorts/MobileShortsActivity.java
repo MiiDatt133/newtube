@@ -328,9 +328,9 @@ public class MobileShortsActivity extends MobileActivity implements
     // ---------------------------------------------------------------------------------
 
     private void onPagerSettled() {
-        int position = mSnapHelper.getSnapPosition(mPager.getLayoutManager()
-                .findSnapView(mLayoutManager) != null
-                ? mSnapHelper.findSnapView(mLayoutManager) : null);
+        View snapView = mSnapHelper.findSnapView(mLayoutManager);
+        int position = snapView != null ? mPager.getChildAdapterPosition(snapView)
+                : RecyclerView.NO_POSITION;
         if (position == RecyclerView.NO_POSITION) {
             return;
         }
