@@ -48,18 +48,29 @@ jobs:
           sha256sum *.apk > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Upload debug APKs
+      # One artifact per ABI: no need to download a zip with APKs you cannot use
+      # (a 32-bit phone takes the armeabi-v7a one; an arm64 phone the arm64-v8a one;
+      # the universal contains both).
+      - name: Upload armeabi-v7a APK (32-bit ARM)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: NewTube_stmobile_debug_${{ github.sha }}
-          path: smarttubetv/build/outputs/apk/stmobile/debug/*.apk
+          name: NewTube_debug_armeabi-v7a_${{ github.sha }}
+          path: smarttubetv/build/outputs/apk/stmobile/debug/*_armeabi-v7a.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload arm64-v8a APK (64-bit ARM)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: NewTube_debug_arm64-v8a_${{ github.sha }}
+          path: smarttubetv/build/outputs/apk/stmobile/debug/*_arm64-v8a.apk
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload checksums
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: NewTube_stmobile_debug_${{ github.sha }}_checksums
+          name: NewTube_debug_checksums_${{ github.sha }}
           path: smarttubetv/build/outputs/apk/stmobile/debug/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
