@@ -57,7 +57,8 @@ public class ShortsFeedLoaderTest {
 
         mLoader.loadInitial();
 
-        assertTrue(mCallback.loadingChanged);
+        assertEquals("true (start) then false (done)",
+                java.util.Arrays.asList(true, false), mCallback.loadingStates);
         assertEquals(1, mCallback.pagesReceived.size());
         assertEquals(0, mCallback.pagesReceived.get(0).firstNewIndex);
         assertEquals(3, mCallback.pagesReceived.get(0).size);
@@ -224,9 +225,9 @@ public class ShortsFeedLoaderTest {
     }
 
     private static final class TestCallback implements ShortsFeedLoader.Callback {
-        boolean loadingChanged;
         boolean errorReceived;
         boolean endedReceived;
+        final List<Boolean> loadingStates = new ArrayList<>();
         final List<PageInfo> pagesReceived = new ArrayList<>();
 
         @Override
@@ -236,7 +237,7 @@ public class ShortsFeedLoaderTest {
 
         @Override
         public void onFeedLoadingChanged(boolean loading) {
-            loadingChanged = loading;
+            loadingStates.add(loading);
         }
 
         @Override
