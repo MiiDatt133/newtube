@@ -136,10 +136,25 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
             texture.setVisibility(View.VISIBLE);
         }
 
+/** Return the one Surface for this holder's TextureTexture, creating it once. */
+        Surface getSurface() {
+            if (mSurface == null) {
+                android.graphics.SurfaceTexture st = texture.getSurfaceTexture();
+                if (st != null) {
+                    mSurface = new Surface(st);
+                }
+            }
+            return mSurface;
+        }
+
         void unbind() {
             // A recycled page must never keep the player's surface; the activity re-attaches on
             // the next selection.
             mSurfaceHost.onShortSurfaceLost(texture);
+            if (mSurface != null) {
+                mSurface.release();
+                mSurface = null;
+            }
         }
 
         /** Crop-fill: the video keeps its aspect and fills the page, cropped on the long side. */
@@ -185,6 +200,10 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
         @Override
         public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
             mSurfaceHost.onShortSurfaceLost(texture);
+            if (mSurface != null) {
+                mSurface.release();
+                mSurface = null;
+            }
             return true;
         }
 
@@ -192,11 +211,5 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
         public void onSurfaceTextureUpdated(@NonNull android.graphics.SurfaceTexture surface) {
             // no-op
         }
-    }
-
-    /** Attach helper for the activity: hand the player this page's surface once it exists. */
-    public static Surface surfaceOf(TextureView textureView) {
-        android.graphics.SurfaceTexture st = textureView.getSurfaceTexture();
-        return st != null ? new Surface(st) : null;
     }
 }

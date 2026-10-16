@@ -446,12 +446,11 @@ public class MobileShortsActivity extends MobileActivity implements
         }
         ShortsPagerAdapter.Holder page = (ShortsPagerAdapter.Holder) holder;
         mAttachedSurface = page.texture;
-        Surface surface = ShortsPagerAdapter.surfaceOf(page.texture);
+        Surface surface = page.getSurface();
         if (surface != null && mPlayer != null) {
             mPlayer.setVideoSurface(surface);
             page.setVideoSize(mVideoWidth, mVideoHeight);
         }
-        // else: the SurfaceTextureListener fires onShortSurfaceAvailable when it exists
     }
 
     @Override
@@ -460,7 +459,7 @@ public class MobileShortsActivity extends MobileActivity implements
         if (holder == null || holder.texture != textureView || mPlayer == null) {
             return;
         }
-        Surface surface = ShortsPagerAdapter.surfaceOf(textureView);
+        Surface surface = holder.getSurface();
         if (surface != null) {
             mPlayer.setVideoSurface(surface);
             holder.setVideoSize(mVideoWidth, mVideoHeight);

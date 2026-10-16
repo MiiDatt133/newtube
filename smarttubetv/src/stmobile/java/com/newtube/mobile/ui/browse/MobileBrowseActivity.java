@@ -1830,7 +1830,9 @@ public class MobileBrowseActivity extends MobileActivity
         // Home may have been paused while the player crossed landscape/PiP configurations. Those
         // callbacks can arrive while DisplayMetrics still describe the player window, so always
         // reconcile the retained GridLayoutManager against Home's current configuration on resume.
-        updateGridSpanCount(computeSpanCount());
+updateGridSpanCount(computeSpanCount());
+        // Returning from a child screen (e.g. Shorts) may leave the nav highlight stale.
+        syncNavHighlight(mCurrentSectionId);
     }
 
     /**
