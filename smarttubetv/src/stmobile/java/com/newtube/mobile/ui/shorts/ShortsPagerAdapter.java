@@ -135,17 +135,6 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
             texture.setVisibility(View.VISIBLE);
         }
 
-/** Return the one Surface for this holder's TextureTexture, creating it once. */
-        Surface getSurface() {
-            if (mSurface == null) {
-                android.graphics.SurfaceTexture st = texture.getSurfaceTexture();
-                if (st != null) {
-                    mSurface = new Surface(st);
-                }
-            }
-            return mSurface;
-        }
-
         void unbind() {
             // A recycled page must never keep the player's surface; the activity re-attaches on
             // the next selection.
@@ -195,10 +184,6 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
         @Override
         public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
             mSurfaceHost.onShortSurfaceLost(texture);
-            if (mSurface != null) {
-                mSurface.release();
-                mSurface = null;
-            }
             return true;
         }
 
