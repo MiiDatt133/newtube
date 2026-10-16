@@ -393,6 +393,9 @@ public class MobileShortsActivity extends MobileActivity implements
 
     private void selectPage(int position) {
         if (position == mCurrentPosition) {
+            // Re-assert the handover every settle: a failed attach (holder not laid out yet)
+            // would otherwise never retry - audio plays into a surface nobody sees.
+            attachPageSurface(position);
             maybeLoadMore(position);
             return;
         }
@@ -444,6 +447,11 @@ public class MobileShortsActivity extends MobileActivity implements
     private void attachPageSurface(int position) {
         RecyclerView.ViewHolder holder = mPager.findViewHolderForAdapterPosition(position);
         if (!(holder instanceof ShortsPagerAdapter.Holder)) {
+            if (position != RecyclerView.NO_POSITION && position < mAdapter.getItemCount()) {
+                // The snapped page has no laid-out holder yet; retry after the next pass.
+                NetPath.log("shorts attach retry pos=" + position + " (no holder)");
+                mPager.post(this::onPagerSettled);
+            }
             return;
         }
         ShortsPagerAdapter.Holder page = (ShortsPagerAdapter.Holder) holder;
