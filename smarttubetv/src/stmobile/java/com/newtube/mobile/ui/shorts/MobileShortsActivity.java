@@ -466,7 +466,7 @@ public class MobileShortsActivity extends MobileActivity implements
     @Override
     public void onShortSurfaceLost(TextureView textureView) {
         if (mAttachedTexture == textureView && mPlayer != null) {
-            mPlayer.clearVideoTextureView(textureView);
+            mPlayer.clearVideoTextureView();
             mAttachedTexture = null;
         }
     }
