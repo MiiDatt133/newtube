@@ -114,6 +114,7 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
         final TextView title;
         final TextView channel;
         private final SurfaceHost mSurfaceHost;
+        private Surface mSurface;
         private int mVideoWidth;
         private int mVideoHeight;
 
