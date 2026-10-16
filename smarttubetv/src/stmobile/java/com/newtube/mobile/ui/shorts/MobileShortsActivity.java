@@ -325,6 +325,8 @@ public class MobileShortsActivity extends MobileActivity implements
             if (mCurrentPosition == RecyclerView.NO_POSITION && size > 0) {
                 mPager.scrollToPosition(0);
                 onPagerSettled();
+                // findSnapView needs children that only exist after the next layout pass.
+                mPager.post(this::onPagerSettled);
             }
         }
         NetPath.log("shorts feed page first=" + firstNewIndex + " size=" + size);
@@ -449,22 +451,33 @@ public class MobileShortsActivity extends MobileActivity implements
         if (mPlayer != null) {
             mPlayer.setVideoTextureView(page.texture);
             page.setVideoSize(mVideoWidth, mVideoHeight);
+            NetPath.log("shorts attach pos=" + position);
         }
     }
 
     @Override
     public void onShortSurfaceAvailable(TextureView textureView, int videoWidth, int videoHeight) {
         ShortsPagerAdapter.Holder holder = currentHolder();
-        if (holder == null || holder.texture != textureView || mPlayer == null) {
+        if (holder == null || holder.texture != textureView) {
+            // The settle ran before layout had children (or this is a prefetched neighbour).
+            // This callback fires once per surface, so re-run the settle after the next pass
+            // instead of dropping the page for good.
+            NetPath.log("shorts surface early pos=" + mCurrentPosition + " -> post settle");
+            mPager.post(this::onPagerSettled);
+            return;
+        }
+        if (mPlayer == null) {
             return;
         }
         mAttachedTexture = textureView;
         mPlayer.setVideoTextureView(textureView);
+        NetPath.log("shorts attach via surface-available");
         holder.setVideoSize(mVideoWidth, mVideoHeight);
     }
 
     @Override
     public void onShortSurfaceLost(TextureView textureView) {
+        NetPath.log("shorts surface-lost matches=" + (mAttachedTexture == textureView));
         if (mAttachedTexture == textureView && mPlayer != null) {
             mPlayer.clearVideoTextureView(textureView);
             mAttachedTexture = null;
@@ -527,18 +540,27 @@ public class MobileShortsActivity extends MobileActivity implements
         // Same route choice the watch page's VideoLoaderController makes, in its order of
         // preference: DASH (generated MPD) for regular VOD, HLS/live URLs when that is all there
         // is, progressive url list as the last resort.
+        String route;
         if (info.isLive() && info.containsDashUrl()) {
+            route = "dash-live";
             mPlayerController.openDashUrl(info.getDashManifestUrl());
         } else if (info.containsDashFormats()) {
+            route = "dash";
             mPlayerController.openDash(info);
         } else if (info.containsHlsUrl()) {
+            route = "hls";
             mPlayerController.openHlsUrl(info.getHlsManifestUrl());
         } else if (info.containsUrlFormats()) {
+            route = "progressive";
             mPlayerController.openProgressive(info);
         } else {
             showPlaybackError(info.getPlayabilityReason());
             return;
         }
+        NetPath.log("shorts open route=" + route + " video=" + video.videoId);
+        // The open may have raced the surface handover; re-asserting is idempotent (media3
+        // keeps the same SurfaceTexture).
+        attachPageSurface(mCurrentPosition);
         mPlayer.setPlayWhenReady(!mUserPaused);
     }
 
