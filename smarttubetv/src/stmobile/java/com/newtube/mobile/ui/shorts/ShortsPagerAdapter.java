@@ -2,7 +2,6 @@ package com.newtube.mobile.ui.shorts;
 
 import android.graphics.Matrix;
 import android.view.LayoutInflater;
-import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -114,7 +113,6 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
         final TextView title;
         final TextView channel;
         private final SurfaceHost mSurfaceHost;
-        private Surface mSurface;
         private int mVideoWidth;
         private int mVideoHeight;
 
@@ -152,10 +150,6 @@ public final class ShortsPagerAdapter extends RecyclerView.Adapter<ShortsPagerAd
             // A recycled page must never keep the player's surface; the activity re-attaches on
             // the next selection.
             mSurfaceHost.onShortSurfaceLost(texture);
-            if (mSurface != null) {
-                mSurface.release();
-                mSurface = null;
-            }
         }
 
         /** Crop-fill: the video keeps its aspect and fills the page, cropped on the long side. */

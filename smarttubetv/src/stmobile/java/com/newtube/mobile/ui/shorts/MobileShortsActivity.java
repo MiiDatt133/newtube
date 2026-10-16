@@ -114,7 +114,7 @@ public class MobileShortsActivity extends MobileActivity implements
     private int mLikeStatus = MediaItemMetadata.LIKE_STATUS_INDIFFERENT;
 
     @Nullable private Video mCurrentVideo;
-    @Nullable private TextureView mAttachedSurface;
+    @Nullable private TextureView mAttachedTexture;
     private int mVideoWidth;
     private int mVideoHeight;
     private int mCurrentPosition = RecyclerView.NO_POSITION;
@@ -438,17 +438,16 @@ public class MobileShortsActivity extends MobileActivity implements
         return holder instanceof ShortsPagerAdapter.Holder ? (ShortsPagerAdapter.Holder) holder : null;
     }
 
-    /** Hand the single player the settled page's surface (or wait for its TextureView). */
+    /** Hand the single player the settled page's TextureView (media3 manages the Surface). */
     private void attachPageSurface(int position) {
         RecyclerView.ViewHolder holder = mPager.findViewHolderForAdapterPosition(position);
         if (!(holder instanceof ShortsPagerAdapter.Holder)) {
             return;
         }
         ShortsPagerAdapter.Holder page = (ShortsPagerAdapter.Holder) holder;
-        mAttachedSurface = page.texture;
-        Surface surface = page.getSurface();
-        if (surface != null && mPlayer != null) {
-            mPlayer.setVideoSurface(surface);
+        mAttachedTexture = page.texture;
+        if (mPlayer != null) {
+            mPlayer.setVideoTextureView(page.texture);
             page.setVideoSize(mVideoWidth, mVideoHeight);
         }
     }
@@ -459,18 +458,16 @@ public class MobileShortsActivity extends MobileActivity implements
         if (holder == null || holder.texture != textureView || mPlayer == null) {
             return;
         }
-        Surface surface = holder.getSurface();
-        if (surface != null) {
-            mPlayer.setVideoSurface(surface);
-            holder.setVideoSize(mVideoWidth, mVideoHeight);
-        }
+        mAttachedTexture = textureView;
+        mPlayer.setVideoTextureView(textureView);
+        holder.setVideoSize(mVideoWidth, mVideoHeight);
     }
 
     @Override
     public void onShortSurfaceLost(TextureView textureView) {
-        if (mAttachedSurface == textureView && mPlayer != null) {
-            mPlayer.setVideoSurface(null);
-            mAttachedSurface = null;
+        if (mAttachedTexture == textureView && mPlayer != null) {
+            mPlayer.clearVideoTextureView(textureView);
+            mAttachedTexture = null;
         }
     }
 
